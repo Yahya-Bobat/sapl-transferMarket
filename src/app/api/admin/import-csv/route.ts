@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       const lastName = map(row, "Last Name");
       const email = map(row, "Email Addr");
       const userName = map(row, "User Name");
-      const role = mapStr(row, "Role") || "Player";
+      const role = mapStr(row, "Role") || "Starter";
       const teams = map(row, "Teams");
       const activeFrom = map(row, "Active From");
       const activeTo = map(row, "Active To");

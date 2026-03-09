@@ -65,7 +65,7 @@ export default function DashboardPage() {
         setLeagues(Array.isArray(data.preferredLeagues) ? data.preferredLeagues : []);
         setBio(data.bio ?? "");
         setGamertag(data.gamertag ?? "");
-        setRole(data.role ?? "Player");
+        setRole(ROLES.includes(data.role) ? data.role : "Starter");
         setPlatform(data.platform ?? "");
       })
       .catch(() => router.replace("/login"))
@@ -90,7 +90,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           listed,
           gamertag: gamertag.trim() || null,
-          role: role.trim() || "Player",
+          role: role.trim() || "Starter",
           platform: platform.trim() || null,
           preferredPositions: positions,
           preferredLeagues: leagues,

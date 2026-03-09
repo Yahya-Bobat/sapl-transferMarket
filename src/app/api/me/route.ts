@@ -43,7 +43,7 @@ export async function PATCH(request: Request) {
     const data: Parameters<typeof prisma.player.update>[0]["data"] = {};
     if (typeof listed === "boolean") data.listed = listed;
     if (gamertag !== undefined) data.gamertag = gamertag?.trim() || null;
-    if (role !== undefined) data.role = role?.trim() || "Player";
+    if (role !== undefined) data.role = role?.trim() || "Starter";
     if (platform !== undefined) data.platform = platform?.trim() || null;
     if (Array.isArray(preferredPositions)) data.preferredPositions = JSON.stringify(preferredPositions);
     if (Array.isArray(preferredLeagues)) data.preferredLeagues = JSON.stringify(preferredLeagues);

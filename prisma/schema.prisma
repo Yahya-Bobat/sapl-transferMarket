@@ -19,7 +19,7 @@ model Player {
 
   // LeagueRepublic CSV fields (PERSON_3377)
   personId    String   @unique // Person ID from LeagueRepublic
-  role        String   @default("Player")
+  role        String   @default("Starter")
   teams       String?  // comma-separated or single
   activeFrom  String?
   activeTo    String?

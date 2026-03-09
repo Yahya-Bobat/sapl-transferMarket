@@ -12,15 +12,22 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const league = searchParams.get("league");
   const position = searchParams.get("position");
+  const platform = searchParams.get("platform");
   try {
-    const where: { listed: boolean; preferredLeagues?: { contains: string }; preferredPositions?: { contains: string } } = {
-      listed: true,
-    };
+    const where: {
+      listed: boolean;
+      preferredLeagues?: { contains: string };
+      preferredPositions?: { contains: string };
+      platform?: string | null;
+    } = { listed: true };
     if (league?.trim()) {
       where.preferredLeagues = { contains: league.trim() };
     }
     if (position?.trim()) {
       where.preferredPositions = { contains: position.trim() };
+    }
+    if (platform?.trim()) {
+      where.platform = platform.trim();
     }
     const captain = await getCurrentCaptain();
     const players = await prisma.player.findMany({
@@ -42,6 +49,8 @@ export async function GET(request: Request) {
         firstName: string | null;
         lastName: string | null;
         gamertag: string | null;
+        role: string | null;
+        platform: string | null;
         preferredPositions: string[];
         preferredLeagues: string[];
         bio: string | null;
@@ -52,9 +61,10 @@ export async function GET(request: Request) {
         id: p.id,
         firstName: p.firstName,
         lastName: p.lastName,
-        // Profile gamertag overrides; else LeagueRepublic Internal Ref 1 or 2
         gamertag:
           (p.gamertag?.trim() || p.internalRef1?.trim() || p.internalRef2?.trim()) || null,
+        role: p.role || null,
+        platform: p.platform || null,
         preferredPositions: parsePositions(p.preferredPositions),
         preferredLeagues: parseLeagues(p.preferredLeagues),
         bio: p.bio,

@@ -26,12 +26,16 @@ export async function PATCH(request: Request) {
     const {
       listed,
       gamertag,
+      role,
+      platform,
       preferredPositions,
       preferredLeagues,
       bio,
     } = body as {
       listed?: boolean;
       gamertag?: string | null;
+      role?: string | null;
+      platform?: string | null;
       preferredPositions?: string[];
       preferredLeagues?: string[];
       bio?: string | null;
@@ -39,12 +43,16 @@ export async function PATCH(request: Request) {
     const data: {
       listed?: boolean;
       gamertag?: string | null;
+      role?: string | null;
+      platform?: string | null;
       preferredPositions?: string;
       preferredLeagues?: string;
       bio?: string | null;
     } = {};
     if (typeof listed === "boolean") data.listed = listed;
     if (gamertag !== undefined) data.gamertag = gamertag?.trim() || null;
+    if (role !== undefined) data.role = role?.trim() || "Player";
+    if (platform !== undefined) data.platform = platform?.trim() || null;
     if (Array.isArray(preferredPositions)) data.preferredPositions = JSON.stringify(preferredPositions);
     if (Array.isArray(preferredLeagues)) data.preferredLeagues = JSON.stringify(preferredLeagues);
     if (bio !== undefined) data.bio = bio ?? null;

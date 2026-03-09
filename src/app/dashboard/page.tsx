@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { POSITIONS } from "@/lib/positions";
 import { DEFAULT_LEAGUES } from "@/lib/leagues";
+import { ROLES } from "@/lib/roles";
+import { PLATFORMS } from "@/lib/platforms";
 
 type Player = {
   id: string;
@@ -17,6 +19,8 @@ type Player = {
   status: string | null;
   listed: boolean;
   gamertag: string | null;
+  role: string | null;
+  platform: string | null;
   internalRef1: string | null;
   internalRef2: string | null;
   preferredPositions: string[];
@@ -42,6 +46,8 @@ export default function DashboardPage() {
   const [leagues, setLeagues] = useState<string[]>([]);
   const [bio, setBio] = useState("");
   const [gamertag, setGamertag] = useState("");
+  const [role, setRole] = useState("");
+  const [platform, setPlatform] = useState("");
   const [trialRequests, setTrialRequests] = useState<TrialRequest[]>([]);
   const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
 
@@ -59,6 +65,8 @@ export default function DashboardPage() {
         setLeagues(Array.isArray(data.preferredLeagues) ? data.preferredLeagues : []);
         setBio(data.bio ?? "");
         setGamertag(data.gamertag ?? "");
+        setRole(data.role ?? "Player");
+        setPlatform(data.platform ?? "");
       })
       .catch(() => router.replace("/login"))
       .finally(() => setLoading(false));
@@ -82,6 +90,8 @@ export default function DashboardPage() {
         body: JSON.stringify({
           listed,
           gamertag: gamertag.trim() || null,
+          role: role.trim() || "Player",
+          platform: platform.trim() || null,
           preferredPositions: positions,
           preferredLeagues: leagues,
           bio: bio || null,
@@ -192,6 +202,35 @@ export default function DashboardPage() {
         <p className="text-sm text-[var(--muted)]">
           Only when this is on will you appear in the market for other teams to see.
         </p>
+      </div>
+
+      <div className="card space-y-4">
+        <h2 className="font-semibold text-[var(--text)]">Role</h2>
+        <p className="text-sm text-[var(--muted)]">Your role in the team.</p>
+        <select
+          className="input max-w-xs"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+        >
+          {ROLES.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="card space-y-4">
+        <h2 className="font-semibold text-[var(--text)]">Platform</h2>
+        <p className="text-sm text-[var(--muted)]">Which platform you play on.</p>
+        <select
+          className="input max-w-xs"
+          value={platform}
+          onChange={(e) => setPlatform(e.target.value)}
+        >
+          <option value="">Select platform</option>
+          {PLATFORMS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
       </div>
 
       <div className="card space-y-4">

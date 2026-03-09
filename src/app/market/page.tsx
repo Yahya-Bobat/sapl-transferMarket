@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DEFAULT_LEAGUES } from "@/lib/leagues";
 import { POSITIONS } from "@/lib/positions";
+import { PLATFORMS } from "@/lib/platforms";
 
 type MarketPlayer = {
   id: string;
   firstName: string | null;
   lastName: string | null;
   gamertag: string | null;
+  role: string | null;
+  platform: string | null;
   preferredPositions: string[];
   preferredLeagues: string[];
   bio: string | null;
@@ -23,6 +26,7 @@ export default function MarketPage() {
   const [loading, setLoading] = useState(true);
   const [filterLeague, setFilterLeague] = useState("");
   const [filterPosition, setFilterPosition] = useState("");
+  const [filterPlatform, setFilterPlatform] = useState("");
   const [isCaptain, setIsCaptain] = useState(false);
   const [requestingId, setRequestingId] = useState<string | null>(null);
   const [trialMessage, setTrialMessage] = useState("");
@@ -32,6 +36,7 @@ export default function MarketPage() {
     const params = new URLSearchParams();
     if (filterLeague) params.set("league", filterLeague);
     if (filterPosition) params.set("position", filterPosition);
+    if (filterPlatform) params.set("platform", filterPlatform);
     fetch(`/api/market?${params}`, { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
@@ -39,7 +44,7 @@ export default function MarketPage() {
         else setPlayers([]);
       })
       .finally(() => setLoading(false));
-  }, [filterLeague, filterPosition]);
+  }, [filterLeague, filterPosition, filterPlatform]);
 
   useEffect(() => {
     fetch("/api/captain/me", { credentials: "include" })
@@ -146,6 +151,19 @@ export default function MarketPage() {
             ))}
           </select>
         </div>
+        <div>
+          <label className="block text-sm text-[var(--muted)]">Platform</label>
+          <select
+            className="input mt-1 w-auto min-w-[120px]"
+            value={filterPlatform}
+            onChange={(e) => setFilterPlatform(e.target.value)}
+          >
+            <option value="">All platforms</option>
+            {PLATFORMS.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -168,6 +186,11 @@ export default function MarketPage() {
                   </span>
                 )}
               </div>
+              {(p.role || p.platform) && (
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  {[p.role, p.platform].filter(Boolean).join(" · ")}
+                </p>
+              )}
               {p.preferredPositions.length > 0 && (
                 <p className="mt-2 text-sm text-[var(--text)]">
                   Positions: {p.preferredPositions.join(", ")}

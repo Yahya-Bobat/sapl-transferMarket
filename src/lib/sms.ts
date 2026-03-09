@@ -8,7 +8,11 @@ export async function sendSms(toE164: string, body: string): Promise<{ ok: boole
   const fromNumber = process.env.TWILIO_PHONE_NUMBER;
 
   if (!accountSid || !authToken || !fromNumber) {
-    console.log("[SMS dev mode] To:", toE164, "Body:", body);
+    console.log("[SMS dev mode] Missing:", {
+      TWILIO_ACCOUNT_SID: !accountSid,
+      TWILIO_AUTH_TOKEN: !authToken,
+      TWILIO_PHONE_NUMBER: !fromNumber,
+    }, "To:", toE164, "Body:", body);
     return { ok: true };
   }
 

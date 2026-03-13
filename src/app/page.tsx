@@ -27,9 +27,6 @@ export default function HomePage() {
           <li>Set your preferred positions and leagues, then turn <strong className="text-[var(--text)]">Listed</strong> on to appear in the market.</li>
           <li>Only players who have listed themselves appear in the market.</li>
         </ul>
-        <p className="mt-4 text-sm text-[var(--muted)]">
-          <a href="/admin/import" className="text-[var(--accent)] hover:underline">Admin: Import CSV</a>
-        </p>
       </section>
     </div>
   );

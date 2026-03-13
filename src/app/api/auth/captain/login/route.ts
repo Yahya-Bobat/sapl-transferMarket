@@ -24,6 +24,18 @@ export async function POST(request: Request) {
     if (!ok) {
       return NextResponse.json({ error: "Invalid password" }, { status: 401 });
     }
+    if (captain.approvalStatus === "pending") {
+      return NextResponse.json(
+        { error: "Your account is pending approval. You'll be able to sign in once an admin approves your registration." },
+        { status: 403 }
+      );
+    }
+    if (captain.approvalStatus === "rejected") {
+      return NextResponse.json(
+        { error: "Your registration was not approved. Please contact the league admin." },
+        { status: 403 }
+      );
+    }
     await setCaptainSession(captain.id);
     return NextResponse.json({
       ok: true,

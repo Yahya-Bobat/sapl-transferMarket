@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function CaptainLoginPage() {
   const router = useRouter();
@@ -48,7 +49,7 @@ export default function CaptainLoginPage() {
               Forgot password?
             </Link>
           </div>
-          <input type="password" className="input mt-1" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
         {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
         <button type="submit" className="btn-primary w-full" disabled={loading}>

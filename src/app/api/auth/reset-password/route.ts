@@ -2,9 +2,21 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { toFullNumber, normalizedFormsForMatch } from "@/lib/phone";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+
+    // Rate limit per IP: 10 requests per hour
+    const ipCheck = checkRateLimit(`player-reset:ip:${ip}`, 10, 60 * 60 * 1000);
+    if (!ipCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { dialingCode, phoneNumber, code, newPassword } = body as {
       dialingCode: string;
@@ -17,6 +29,16 @@ export async function POST(request: Request) {
     if (!full) {
       return NextResponse.json({ error: "Phone number required" }, { status: 400 });
     }
+
+    // Rate limit per phone: 3 requests per hour
+    const phoneCheck = checkRateLimit(`player-reset:phone:${full}`, 3, 60 * 60 * 1000);
+    if (!phoneCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many reset attempts for this number. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     if (!code || !newPassword || newPassword.length < 6) {
       return NextResponse.json({ error: "OTP code and new password (min 6 characters) required" }, { status: 400 });
     }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DIALING_CODES } from "@/lib/phone";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,10 +17,12 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setNotFound(false);
     setSendingOtp(true);
     try {
       const res = await fetch("/api/auth/send-otp", {
@@ -28,7 +31,11 @@ export default function RegisterPage() {
         body: JSON.stringify({ dialingCode, phoneNumber: phoneNumber.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to send code"); return; }
+      if (!res.ok) {
+        if (res.status === 404) { setNotFound(true); }
+        else { setError(data.error || "Failed to send code"); }
+        return;
+      }
       setStep("verify");
       setOtp("");
     } finally {
@@ -81,6 +88,23 @@ export default function RegisterPage() {
             </div>
           </div>
           {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+          {notFound && (
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+              <p className="text-sm text-[var(--danger)]">
+                No player found with this phone number.
+              </p>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Your number must be in the LeagueRepublic import. If you think this is wrong, you
+                can apply for manual verification and an admin will sort it out.
+              </p>
+              <Link
+                href="/register/manual"
+                className="mt-3 inline-block rounded-lg border border-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition"
+              >
+                Apply for manual verification
+              </Link>
+            </div>
+          )}
           <button type="submit" className="btn-primary w-full" disabled={sendingOtp}>
             {sendingOtp ? "Sending code…" : "Send verification code"}
           </button>
@@ -104,11 +128,11 @@ export default function RegisterPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-[var(--muted)]">Password (min 6 characters)</label>
-            <input type="password" className="input mt-1" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required />
           </div>
           <div>
             <label className="block text-sm font-medium text-[var(--muted)]">Confirm password</label>
-            <input type="password" className="input mt-1" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={6} required />
+            <PasswordInput value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={6} required />
           </div>
           {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
           <button type="submit" className="btn-primary w-full" disabled={loading}>

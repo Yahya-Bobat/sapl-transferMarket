@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import PasswordInput from "@/components/PasswordInput";
 
 function ResetForm() {
   const router = useRouter();
@@ -58,11 +59,11 @@ function ResetForm() {
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
           <label className="block text-sm font-medium text-[var(--muted)]">New password</label>
-          <input type="password" className="input mt-1" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={6} required />
+          <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={6} required />
         </div>
         <div>
           <label className="block text-sm font-medium text-[var(--muted)]">Confirm new password</label>
-          <input type="password" className="input mt-1" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={6} required />
+          <PasswordInput value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={6} required />
         </div>
         {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
         <button type="submit" className="btn-primary w-full" disabled={loading || !token}>

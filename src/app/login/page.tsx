@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DIALING_CODES } from "@/lib/phone";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -79,9 +80,7 @@ export default function LoginPage() {
               Forgot password?
             </Link>
           </div>
-          <input
-            type="password"
-            className="input mt-1"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required

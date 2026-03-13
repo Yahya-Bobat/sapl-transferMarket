@@ -2,13 +2,32 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import crypto from "crypto";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+
+    // Rate limit per IP: 10 requests per hour
+    const ipCheck = checkRateLimit(`capt-reset:ip:${ip}`, 10, 60 * 60 * 1000);
+    if (!ipCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const { email } = (await request.json()) as { email: string };
     const emailTrim = email?.trim().toLowerCase();
     if (!emailTrim) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
+    }
+
+    // Rate limit per email: 3 requests per hour
+    const emailCheck = checkRateLimit(`capt-reset:email:${emailTrim}`, 3, 60 * 60 * 1000);
+    if (!emailCheck.allowed) {
+      // Generic response — don't reveal whether email exists
+      return NextResponse.json({ ok: true });
     }
 
     const captain = await prisma.captain.findUnique({ where: { email: emailTrim } });

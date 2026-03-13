@@ -52,6 +52,7 @@ export default function DashboardPage() {
   const [previousClub, setPreviousClub] = useState("");
   const [trialRequests, setTrialRequests] = useState<TrialRequest[]>([]);
   const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
+  const [clubSuggestions, setClubSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     fetch("/api/me")
@@ -79,6 +80,13 @@ export default function DashboardPage() {
       .then((data) => (Array.isArray(data) ? setTrialRequests(data) : setTrialRequests([])))
       .catch(() => setTrialRequests([]));
   }, [player?.id]);
+
+  useEffect(() => {
+    fetch("/api/clubs")
+      .then((r) => r.json())
+      .then((data) => (Array.isArray(data) ? setClubSuggestions(data) : setClubSuggestions([])))
+      .catch(() => setClubSuggestions([]));
+  }, []);
 
   async function handleSave() {
     if (!player) return;
@@ -214,7 +222,12 @@ export default function DashboardPage() {
         <div>
           <label className="block text-sm font-medium text-[var(--text)]">Previous club</label>
           <p className="mb-1 text-xs text-[var(--muted)]">Leave blank if you are a free agent.</p>
-          <input type="text" className="input max-w-xs" value={previousClub} onChange={(e) => setPreviousClub(e.target.value)} placeholder="e.g. FC Zamalek (or leave blank)" />
+          <input type="text" className="input max-w-xs" list="club-suggestions" value={previousClub} onChange={(e) => setPreviousClub(e.target.value)} placeholder="e.g. FC Zamalek (or leave blank)" />
+          <datalist id="club-suggestions">
+            {clubSuggestions.map((club) => (
+              <option key={club} value={club} />
+            ))}
+          </datalist>
         </div>
 
         <div>

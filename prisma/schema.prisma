@@ -118,3 +118,25 @@ model CaptainResetToken {
   token     String   @unique
   expiresAt DateTime
 }
+
+model PendingPlayerRegistration {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Info submitted by the applicant
+  firstName   String
+  lastName    String
+  dialingCode String   @default("27")
+  phoneNumber String   // raw input as entered
+  email       String?
+  personId    String?  // LeagueRepublic Person ID if they know it
+  teamName    String?  // which SAPL team they play for
+  notes       String?  // free text explanation
+
+  // Admin resolution
+  status         String   @default("pending") // pending | approved | rejected
+  adminNotes     String?
+  linkedPlayerId String?  // Player.id if admin links to existing record
+  reviewedAt     DateTime?
+}

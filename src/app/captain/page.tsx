@@ -149,7 +149,7 @@ export default function CaptainPage() {
             type="button"
             className="btn-ghost"
             onClick={async () => {
-              await fetch("/api/captain/logout", { method: "POST" });
+              await fetch("/api/auth/captain/logout", { method: "POST" });
               router.push("/");
               router.refresh();
             }}

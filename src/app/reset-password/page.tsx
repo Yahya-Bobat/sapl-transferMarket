@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DIALING_CODES } from "@/lib/phone";
+import PasswordInput from "@/components/PasswordInput";
 
 type Step = "phone" | "code" | "done";
 
@@ -154,9 +155,7 @@ export default function ResetPasswordPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--muted)]">New password</label>
-              <input
-                type="password"
-                className="input mt-1"
+              <PasswordInput
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 minLength={6}
@@ -165,9 +164,7 @@ export default function ResetPasswordPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--muted)]">Confirm new password</label>
-              <input
-                type="password"
-                className="input mt-1"
+              <PasswordInput
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 minLength={6}

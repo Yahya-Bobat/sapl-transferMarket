@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function CaptainRegisterPage() {
   const [email, setEmail] = useState("");
@@ -62,11 +63,11 @@ export default function CaptainRegisterPage() {
         </div>
         <div>
           <label className="block text-sm font-medium text-[var(--muted)]">Password (min 6 characters)</label>
-          <input type="password" className="input mt-1" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required />
         </div>
         <div>
           <label className="block text-sm font-medium text-[var(--muted)]">Confirm password</label>
-          <input type="password" className="input mt-1" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={6} required />
+          <PasswordInput value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={6} required />
         </div>
         {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
         <button type="submit" className="btn-primary w-full" disabled={loading}>

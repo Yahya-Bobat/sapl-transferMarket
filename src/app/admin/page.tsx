@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ConfirmModal from "@/components/ConfirmModal";
 
 type CaptainRow = {
   id: string;
@@ -30,6 +31,13 @@ type PlayerRegRow = {
   reviewedAt: string | null;
 };
 
+type PendingConfirm = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+} | null;
+
 export default function AdminPage() {
   const router = useRouter();
   const [captains, setCaptains] = useState<CaptainRow[]>([]);
@@ -42,6 +50,9 @@ export default function AdminPage() {
   const [linkPersonId, setLinkPersonId] = useState("");
   const [linkNotes, setLinkNotes] = useState("");
   const [linkError, setLinkError] = useState("");
+
+  // Confirm modal state
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm>(null);
 
   useEffect(() => {
     fetch("/api/admin/me", { credentials: "include" })
@@ -173,7 +184,12 @@ export default function AdminPage() {
                   <button
                     type="button"
                     disabled={actionId === c.id}
-                    onClick={() => handleCaptainAction(c.id, "reject")}
+                    onClick={() => setPendingConfirm({
+                      title: "Reject captain",
+                      message: `Reject ${c.teamName || c.email}? They won't be able to sign in.`,
+                      confirmLabel: "Reject",
+                      onConfirm: () => { handleCaptainAction(c.id, "reject"); setPendingConfirm(null); },
+                    })}
                     className="rounded bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30"
                   >
                     Reject
@@ -184,7 +200,12 @@ export default function AdminPage() {
                 <button
                   type="button"
                   disabled={actionId === c.id}
-                  onClick={() => handleCaptainAction(c.id, "reject")}
+                  onClick={() => setPendingConfirm({
+                    title: "Revoke approval",
+                    message: `Revoke ${c.teamName || c.email}'s approval? They'll be blocked from signing in.`,
+                    confirmLabel: "Revoke",
+                    onConfirm: () => { handleCaptainAction(c.id, "reject"); setPendingConfirm(null); },
+                  })}
                   className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5"
                 >
                   Revoke
@@ -349,7 +370,12 @@ export default function AdminPage() {
                         <button
                           type="button"
                           disabled={actionId === r.id}
-                          onClick={() => handlePlayerRegAction(r.id, "reject")}
+                          onClick={() => setPendingConfirm({
+                            title: "Reject registration",
+                            message: `Reject ${r.firstName} ${r.lastName}'s registration request?`,
+                            confirmLabel: "Reject",
+                            onConfirm: () => { handlePlayerRegAction(r.id, "reject"); setPendingConfirm(null); },
+                          })}
                           className="rounded bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30"
                         >
                           Reject
@@ -413,6 +439,16 @@ export default function AdminPage() {
           </section>
         </>
       )}
+
+      <ConfirmModal
+        open={!!pendingConfirm}
+        title={pendingConfirm?.title ?? ""}
+        message={pendingConfirm?.message ?? ""}
+        confirmLabel={pendingConfirm?.confirmLabel ?? "Confirm"}
+        danger
+        onConfirm={() => pendingConfirm?.onConfirm()}
+        onCancel={() => setPendingConfirm(null)}
+      />
     </div>
   );
 }

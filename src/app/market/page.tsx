@@ -47,6 +47,8 @@ const CLUB_STATUSES = [
   "Open to both",
 ];
 
+const CAP_PAGE_SIZE = 12;
+
 export default function MarketPage() {
   const [tab, setTab] = useState<Tab>("players");
 
@@ -77,21 +79,50 @@ export default function MarketPage() {
   const [copiedTime, setCopiedTime] = useState<Record<string, number>>({});
   const [delistingId, setDelistingId] = useState<string | null>(null);
 
+  // Pagination state — players (server-side)
+  const [playerPage, setPlayerPage] = useState(1);
+  const [playerTotalPages, setPlayerTotalPages] = useState(1);
+  const [playerTotal, setPlayerTotal] = useState(0);
+
+  // Pagination state — captains (client-side)
+  const [capPage, setCapPage] = useState(1);
+
   useEffect(() => {
     const params = new URLSearchParams();
     if (filterLeague) params.set("league", filterLeague);
     if (filterPosition) params.set("position", filterPosition);
     if (filterPlatform) params.set("platform", filterPlatform);
     if (filterRole) params.set("role", filterRole);
+    params.set("page", String(playerPage));
     setLoading(true);
     fetch(`/api/market?${params}`, { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setPlayers(data);
-        else setPlayers([]);
+        if (data.players && Array.isArray(data.players)) {
+          setPlayers(data.players);
+          setPlayerTotalPages(data.totalPages || 1);
+          setPlayerTotal(data.total || 0);
+        } else if (Array.isArray(data)) {
+          // Fallback for old API format
+          setPlayers(data);
+          setPlayerTotalPages(1);
+          setPlayerTotal(data.length);
+        } else {
+          setPlayers([]);
+        }
       })
       .finally(() => setLoading(false));
+  }, [filterLeague, filterPosition, filterPlatform, filterRole, playerPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPlayerPage(1);
   }, [filterLeague, filterPosition, filterPlatform, filterRole]);
+
+  // Reset captain page when filters change
+  useEffect(() => {
+    setCapPage(1);
+  }, [capFilterLeague, capFilterPosition, capFilterPlatform, capFilterRole, capFilterClubStatus]);
 
   useEffect(() => {
     fetch("/api/captain/me", { credentials: "include" })
@@ -130,6 +161,13 @@ export default function MarketPage() {
     if (capFilterClubStatus && c.clubStatus !== capFilterClubStatus) return false;
     return true;
   });
+
+  // Client-side pagination for captains
+  const capTotalPages = Math.max(1, Math.ceil(filteredCaptains.length / CAP_PAGE_SIZE));
+  const paginatedCaptains = filteredCaptains.slice(
+    (capPage - 1) * CAP_PAGE_SIZE,
+    capPage * CAP_PAGE_SIZE
+  );
 
   async function handleRequestTrial(playerId: string) {
     setRequestingId(playerId);
@@ -221,6 +259,48 @@ export default function MarketPage() {
 
   const displayName = (p: MarketPlayer) =>
     [p.firstName, p.lastName].filter(Boolean).join(" ") || p.gamertag || "Player";
+
+  // Pagination controls component
+  function Pagination({
+    page,
+    totalPages,
+    total,
+    onPageChange,
+    label,
+  }: {
+    page: number;
+    totalPages: number;
+    total: number;
+    onPageChange: (p: number) => void;
+    label: string;
+  }) {
+    if (totalPages <= 1) return null;
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <p className="text-sm text-[var(--muted)]">
+          Page {page} of {totalPages} — {total} {label}
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => onPageChange(page - 1)}
+            className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ← Previous
+          </button>
+          <button
+            type="button"
+            disabled={page >= totalPages}
+            onClick={() => onPageChange(page + 1)}
+            className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -321,85 +401,94 @@ export default function MarketPage() {
           ) : players.length === 0 ? (
             <div className="card text-center text-[var(--muted)]">No players listed at the moment.</div>
           ) : (
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {players.map((p) => (
-                <li key={p.id} className="card flex flex-col">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-[var(--text)]">{displayName(p)}</span>
-                    {p.gamertag && (
-                      <span className="rounded bg-[var(--border)] px-2 py-0.5 text-xs text-[var(--muted)]">{p.gamertag}</span>
+            <>
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {players.map((p) => (
+                  <li key={p.id} className="card flex flex-col">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-[var(--text)]">{displayName(p)}</span>
+                      {p.gamertag && (
+                        <span className="rounded bg-[var(--border)] px-2 py-0.5 text-xs text-[var(--muted)]">{p.gamertag}</span>
+                      )}
+                    </div>
+                    {(p.role || p.platform) && (
+                      <p className="mt-1 text-sm text-[var(--muted)]">{[p.role, p.platform].filter(Boolean).join(" · ")}</p>
                     )}
-                  </div>
-                  {(p.role || p.platform) && (
-                    <p className="mt-1 text-sm text-[var(--muted)]">{[p.role, p.platform].filter(Boolean).join(" · ")}</p>
-                  )}
-                  {p.preferredPositions.length > 0 && (
-                    <p className="mt-2 text-sm text-[var(--text)]">Positions: {p.preferredPositions.join(", ")}</p>
-                  )}
-                  {p.preferredLeagues.length > 0 && (
-                    <p className="mt-1 text-sm text-[var(--muted)]">Leagues: {p.preferredLeagues.join(", ")}</p>
-                  )}
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    Previous club: {p.previousClub || "Free Agent"}
-                  </p>
-                  {p.bio && <p className="mt-2 text-sm text-[var(--muted)]">{p.bio}</p>}
-                  <div className="mt-auto pt-4 flex flex-wrap gap-2">
-                    {isCaptain && (
-                      <>
-                        {p.alreadyRequestedTrial ? (
-                          <span className="rounded bg-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)]">Trial requested</span>
-                        ) : (
+                    {p.preferredPositions.length > 0 && (
+                      <p className="mt-2 text-sm text-[var(--text)]">Positions: {p.preferredPositions.join(", ")}</p>
+                    )}
+                    {p.preferredLeagues.length > 0 && (
+                      <p className="mt-1 text-sm text-[var(--muted)]">Leagues: {p.preferredLeagues.join(", ")}</p>
+                    )}
+                    <p className="mt-1 text-sm text-[var(--muted)]">
+                      Previous club: {p.previousClub || "Free Agent"}
+                    </p>
+                    {p.bio && <p className="mt-2 text-sm text-[var(--muted)]">{p.bio}</p>}
+                    <div className="mt-auto pt-4 flex flex-wrap gap-2">
+                      {isCaptain && (
+                        <>
+                          {p.alreadyRequestedTrial ? (
+                            <span className="rounded bg-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)]">Trial requested</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setModalPlayer(p)}
+                              className="rounded border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-1.5 text-sm text-[var(--accent)] hover:bg-[var(--accent)]/20"
+                            >
+                              Request trial
+                            </button>
+                          )}
+                          {p.whatsappLink && (
+                            <a href={p.whatsappLink} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-white/5">
+                              Contact via WhatsApp
+                            </a>
+                          )}
+                        </>
+                      )}
+                      {isAdmin && (
+                        <>
+                          <button type="button" onClick={() => copyToClipboard(buildPlayerPost(p), p.id)}
+                            className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
+                            {copiedId === p.id ? "Copied ✓" : getCopiedLabel(p.id)}
+                          </button>
                           <button
                             type="button"
-                            onClick={() => setModalPlayer(p)}
-                            className="rounded border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-1.5 text-sm text-[var(--accent)] hover:bg-[var(--accent)]/20"
-                          >
-                            Request trial
-                          </button>
-                        )}
-                        {p.whatsappLink && (
-                          <a href={p.whatsappLink} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-white/5">
-                            Contact via WhatsApp
-                          </a>
-                        )}
-                      </>
-                    )}
-                    {isAdmin && (
-                      <>
-                        <button type="button" onClick={() => copyToClipboard(buildPlayerPost(p), p.id)}
-                          className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
-                          {copiedId === p.id ? "Copied ✓" : getCopiedLabel(p.id)}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={delistingId === p.id}
-                          onClick={async () => {
-                            setDelistingId(p.id);
-                            try {
-                              const res = await fetch("/api/admin/users", {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                credentials: "include",
-                                body: JSON.stringify({ type: "player", id: p.id, data: { listed: false } }),
-                              });
-                              if (res.ok) {
-                                setPlayers((prev) => prev.filter((pl) => pl.id !== p.id));
+                            disabled={delistingId === p.id}
+                            onClick={async () => {
+                              setDelistingId(p.id);
+                              try {
+                                const res = await fetch("/api/admin/users", {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  credentials: "include",
+                                  body: JSON.stringify({ type: "player", id: p.id, data: { listed: false } }),
+                                });
+                                if (res.ok) {
+                                  setPlayers((prev) => prev.filter((pl) => pl.id !== p.id));
+                                }
+                              } finally {
+                                setDelistingId(null);
                               }
-                            } finally {
-                              setDelistingId(null);
-                            }
-                          }}
-                          className="rounded bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30"
-                        >
-                          {delistingId === p.id ? "Delisting…" : "Delist"}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                            }}
+                            className="rounded bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30"
+                          >
+                            {delistingId === p.id ? "Delisting…" : "Delist"}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <Pagination
+                page={playerPage}
+                totalPages={playerTotalPages}
+                total={playerTotal}
+                onPageChange={setPlayerPage}
+                label="players"
+              />
+            </>
           )}
         </div>
       )}
@@ -455,47 +544,56 @@ export default function MarketPage() {
           ) : filteredCaptains.length === 0 ? (
             <div className="card text-center text-[var(--muted)]">No teams match your filters.</div>
           ) : (
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredCaptains.map((c) => (
-                <li key={c.id} className="card flex flex-col">
-                  <span className="font-semibold text-[var(--text)]">{c.teamName || "Unknown Team"}</span>
-                  {c.platform && <p className="mt-1 text-sm text-[var(--muted)]">{c.platform}</p>}
-                  {c.preferredLeagues.length > 0 && (
-                    <p className="mt-1 text-sm text-[var(--muted)]">Leagues: {c.preferredLeagues.join(", ")}</p>
-                  )}
-                  {c.preferredPositions.length > 0 && (
-                    <p className="mt-1 text-sm text-[var(--text)]">Positions: {c.preferredPositions.join(", ")}</p>
-                  )}
-                  {c.role && <p className="mt-1 text-sm text-[var(--muted)]">Role: {c.role}</p>}
-                  {c.clubStatus && <p className="mt-1 text-sm text-[var(--muted)]">Club status: {c.clubStatus}</p>}
-                  {c.requirements && <p className="mt-2 text-sm text-[var(--muted)]">{c.requirements}</p>}
-                  <div className="mt-auto pt-4 flex flex-wrap gap-2">
-                    {isPlayer && (
-                      <>
-                        {c.trialGroupLink && (
-                          <a href={c.trialGroupLink} target="_blank" rel="noopener noreferrer"
-                            className="rounded border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-1.5 text-sm text-[var(--accent)] hover:bg-[var(--accent)]/20">
-                            Join trial group
-                          </a>
-                        )}
-                        {c.whatsappLink && (
-                          <a href={c.whatsappLink} target="_blank" rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-white/5">
-                            Contact via WhatsApp
-                          </a>
-                        )}
-                      </>
+            <>
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {paginatedCaptains.map((c) => (
+                  <li key={c.id} className="card flex flex-col">
+                    <span className="font-semibold text-[var(--text)]">{c.teamName || "Unknown Team"}</span>
+                    {c.platform && <p className="mt-1 text-sm text-[var(--muted)]">{c.platform}</p>}
+                    {c.preferredLeagues.length > 0 && (
+                      <p className="mt-1 text-sm text-[var(--muted)]">Leagues: {c.preferredLeagues.join(", ")}</p>
                     )}
-                    {isAdmin && (
-                      <button type="button" onClick={() => copyToClipboard(buildCaptainPost(c), `captain-${c.id}`)}
-                        className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
-                        {copiedId === `captain-${c.id}` ? "Copied ✓" : getCopiedLabel(`captain-${c.id}`)}
-                      </button>
+                    {c.preferredPositions.length > 0 && (
+                      <p className="mt-1 text-sm text-[var(--text)]">Positions: {c.preferredPositions.join(", ")}</p>
                     )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    {c.role && <p className="mt-1 text-sm text-[var(--muted)]">Role: {c.role}</p>}
+                    {c.clubStatus && <p className="mt-1 text-sm text-[var(--muted)]">Club status: {c.clubStatus}</p>}
+                    {c.requirements && <p className="mt-2 text-sm text-[var(--muted)]">{c.requirements}</p>}
+                    <div className="mt-auto pt-4 flex flex-wrap gap-2">
+                      {isPlayer && (
+                        <>
+                          {c.trialGroupLink && (
+                            <a href={c.trialGroupLink} target="_blank" rel="noopener noreferrer"
+                              className="rounded border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-1.5 text-sm text-[var(--accent)] hover:bg-[var(--accent)]/20">
+                              Join trial group
+                            </a>
+                          )}
+                          {c.whatsappLink && (
+                            <a href={c.whatsappLink} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text)] hover:bg-white/5">
+                              Contact via WhatsApp
+                            </a>
+                          )}
+                        </>
+                      )}
+                      {isAdmin && (
+                        <button type="button" onClick={() => copyToClipboard(buildCaptainPost(c), `captain-${c.id}`)}
+                          className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
+                          {copiedId === `captain-${c.id}` ? "Copied ✓" : getCopiedLabel(`captain-${c.id}`)}
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <Pagination
+                page={capPage}
+                totalPages={capTotalPages}
+                total={filteredCaptains.length}
+                onPageChange={setCapPage}
+                label="teams"
+              />
+            </>
           )}
         </div>
       )}

@@ -75,6 +75,7 @@ export function getWhatsAppLink(
 export const DIALING_CODES = [
   { code: "27", country: "South Africa", label: "+27" },
   { code: "254", country: "Kenya", label: "+254" },
+  { code: "255", country: "Tanzania", label: "+255" },
   { code: "256", country: "Uganda", label: "+256" },
   { code: "258", country: "Mozambique", label: "+258" },
   { code: "263", country: "Zimbabwe", label: "+263" },

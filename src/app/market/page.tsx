@@ -74,6 +74,8 @@ export default function MarketPage() {
   const [trialMessage, setTrialMessage] = useState("");
   const [modalPlayer, setModalPlayer] = useState<MarketPlayer | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedTime, setCopiedTime] = useState<Record<string, number>>({});
+  const [delistingId, setDelistingId] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -161,12 +163,31 @@ export default function MarketPage() {
   function copyToClipboard(text: string, id: string) {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedId(id);
+      setCopiedTime((prev) => ({ ...prev, [id]: Date.now() }));
       setTimeout(() => setCopiedId(null), 2000);
     });
   }
 
+  function getCopiedLabel(id: string): string {
+    const time = copiedTime[id];
+    if (!time) return "Copy post";
+    const seconds = Math.floor((Date.now() - time) / 1000);
+    if (seconds < 60) return `Copied ${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    return `Copied ${minutes}m ago`;
+  }
+
+  // Re-render every 10s to update "copied X ago" labels
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (Object.keys(copiedTime).length === 0) return;
+    const timer = setInterval(() => setTick((t) => t + 1), 10_000);
+    return () => clearInterval(timer);
+  }, [copiedTime]);
+
   function buildPlayerPost(p: MarketPlayer): string {
     const name = [p.firstName, p.lastName].filter(Boolean).join(" ") || p.gamertag || "Player";
+    const number = p.whatsappNumber ? `@${p.whatsappNumber}` : "—";
     return [
       "*Looking For A Team*",
       `Name: ${name}`,
@@ -177,15 +198,16 @@ export default function MarketPage() {
       `Position: ${p.preferredPositions.join(", ") || "—"}`,
       `Previous Club: ${p.previousClub || "Free Agent"}`,
       `Extra: ${p.bio || "—"}`,
-      `Number: ${p.whatsappNumber || "—"}`,
+      `Number: ${number}`,
     ].join("\n");
   }
 
   function buildCaptainPost(c: CaptainCard): string {
+    const number = c.whatsappNumber ? `@${c.whatsappNumber}` : "—";
     return [
       "*Looking For A Player*",
       `Team: ${c.teamName || "—"}`,
-      `Number: ${c.whatsappNumber || "—"}`,
+      `Number: ${number}`,
       `League: ${c.preferredLeagues.join(", ") || "—"}`,
       `Platform: ${c.platform || "—"}`,
       `Role: ${c.role || "—"}`,
@@ -344,10 +366,35 @@ export default function MarketPage() {
                       </>
                     )}
                     {isAdmin && (
-                      <button type="button" onClick={() => copyToClipboard(buildPlayerPost(p), p.id)}
-                        className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
-                        {copiedId === p.id ? "Copied ✓" : "Copy post"}
-                      </button>
+                      <>
+                        <button type="button" onClick={() => copyToClipboard(buildPlayerPost(p), p.id)}
+                          className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
+                          {copiedId === p.id ? "Copied ✓" : getCopiedLabel(p.id)}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={delistingId === p.id}
+                          onClick={async () => {
+                            setDelistingId(p.id);
+                            try {
+                              const res = await fetch("/api/admin/users", {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "include",
+                                body: JSON.stringify({ type: "player", id: p.id, data: { listed: false } }),
+                              });
+                              if (res.ok) {
+                                setPlayers((prev) => prev.filter((pl) => pl.id !== p.id));
+                              }
+                            } finally {
+                              setDelistingId(null);
+                            }
+                          }}
+                          className="rounded bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30"
+                        >
+                          {delistingId === p.id ? "Delisting…" : "Delist"}
+                        </button>
+                      </>
                     )}
                   </div>
                 </li>
@@ -442,7 +489,7 @@ export default function MarketPage() {
                     {isAdmin && (
                       <button type="button" onClick={() => copyToClipboard(buildCaptainPost(c), `captain-${c.id}`)}
                         className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
-                        {copiedId === `captain-${c.id}` ? "Copied ✓" : "Copy post"}
+                        {copiedId === `captain-${c.id}` ? "Copied ✓" : getCopiedLabel(`captain-${c.id}`)}
                       </button>
                     )}
                   </div>

@@ -14,7 +14,26 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(registrations);
+  // Look up personId for any linked players
+  const linkedIds = registrations.map((r) => r.linkedPlayerId).filter(Boolean) as string[];
+  const linkedPlayers = linkedIds.length > 0
+    ? await prisma.player.findMany({
+        where: { id: { in: linkedIds } },
+        select: { id: true, personId: true, firstName: true, lastName: true },
+      })
+    : [];
+  const playerMap = new Map(linkedPlayers.map((p) => [p.id, p]));
+
+  const result = registrations.map((r) => {
+    const linked = r.linkedPlayerId ? playerMap.get(r.linkedPlayerId) : null;
+    return {
+      ...r,
+      linkedPersonId: linked?.personId || null,
+      linkedPlayerName: linked ? [linked.firstName, linked.lastName].filter(Boolean).join(" ") : null,
+    };
+  });
+
+  return NextResponse.json(result);
 }
 
 // PATCH /api/admin/pending-players — approve, reject, or link a pending registration
@@ -98,6 +117,40 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+// DELETE /api/admin/pending-players — delete resolved registrations
+export async function DELETE(request: Request) {
+  const admin = await getCurrentAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Not authorised" }, { status: 401 });
+  }
+  try {
+    const { registrationId, clearAll } = (await request.json()) as {
+      registrationId?: string;
+      clearAll?: boolean;
+    };
+
+    if (clearAll) {
+      // Delete all resolved (non-pending) registrations
+      await prisma.pendingPlayerRegistration.deleteMany({
+        where: { status: { not: "pending" } },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (registrationId) {
+      await prisma.pendingPlayerRegistration.delete({
+        where: { id: registrationId },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    return NextResponse.json({ error: "registrationId or clearAll required" }, { status: 400 });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

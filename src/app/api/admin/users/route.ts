@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     });
 
     const captains = await prisma.captain.findMany({
+      where: { approvalStatus: { notIn: ["rejected", "revoked"] } },
       orderBy: { createdAt: "desc" },
     });
 
@@ -152,6 +153,11 @@ export async function PATCH(request: Request) {
           const val = data[key];
           allowed[key] = typeof val === "string" && val.trim() ? val.trim() : null;
         }
+      }
+      // Handle authPhone separately — strip + and non-digits
+      if ("authPhone" in data) {
+        const raw = typeof data.authPhone === "string" ? data.authPhone.replace(/\D/g, "") : "";
+        allowed.authPhone = raw || null;
       }
       if ("listed" in data) allowed.listed = !!data.listed;
       if ("preferredPositions" in data && Array.isArray(data.preferredPositions)) {

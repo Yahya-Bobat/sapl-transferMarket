@@ -51,14 +51,13 @@ export default function AdminPage() {
   const [admins, setAdmins] = useState<AdminRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  // Link modal state
   const [linkingId, setLinkingId] = useState<string | null>(null);
   const [linkPersonId, setLinkPersonId] = useState("");
   const [linkNotes, setLinkNotes] = useState("");
   const [linkError, setLinkError] = useState("");
 
-  // Confirm modal state
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm>(null);
 
   useEffect(() => {
@@ -89,8 +88,26 @@ export default function AdminPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Captain actions
-  async function handleCaptainAction(captainId: string, action: "approve" | "reject") {
+  const q = search.trim().toLowerCase();
+
+  function matchesCaptain(c: CaptainRow): boolean {
+    if (!q) return true;
+    return [c.email, c.teamName].filter(Boolean).join(" ").toLowerCase().includes(q);
+  }
+
+  function matchesPlayerReg(r: PlayerRegRow): boolean {
+    if (!q) return true;
+    return [r.firstName, r.lastName, r.email, r.phoneNumber, r.teamName, r.personId, r.notes]
+      .filter(Boolean).join(" ").toLowerCase().includes(q);
+  }
+
+  function matchesAdmin(a: AdminRow): boolean {
+    if (!q) return true;
+    return a.email.toLowerCase().includes(q);
+  }
+
+  // Captain actions: approve, reject, revoke, reapprove
+  async function handleCaptainAction(captainId: string, action: "approve" | "reject" | "revoke" | "reapprove") {
     setActionId(captainId);
     try {
       const res = await fetch("/api/admin/captains", {
@@ -100,11 +117,15 @@ export default function AdminPage() {
         body: JSON.stringify({ captainId, action }),
       });
       if (res.ok) {
+        const statusMap: Record<string, string> = {
+          approve: "approved",
+          reject: "rejected",
+          revoke: "revoked",
+          reapprove: "pending",
+        };
         setCaptains((prev) =>
           prev.map((c) =>
-            c.id === captainId
-              ? { ...c, approvalStatus: action === "approve" ? "approved" : "rejected" }
-              : c
+            c.id === captainId ? { ...c, approvalStatus: statusMap[action] } : c
           )
         );
       }
@@ -113,7 +134,6 @@ export default function AdminPage() {
     }
   }
 
-  // Player registration actions
   async function handlePlayerRegAction(
     registrationId: string,
     action: "approve" | "reject",
@@ -147,18 +167,22 @@ export default function AdminPage() {
     }
   }
 
-  const pendingCaptains = captains.filter((c) => c.approvalStatus === "pending");
-  const approvedCaptains = captains.filter((c) => c.approvalStatus === "approved");
-  const rejectedCaptains = captains.filter((c) => c.approvalStatus === "rejected");
+  const pendingCaptains = captains.filter((c) => c.approvalStatus === "pending" && matchesCaptain(c));
+  const approvedCaptains = captains.filter((c) => c.approvalStatus === "approved" && matchesCaptain(c));
+  const rejectedCaptains = captains.filter((c) => c.approvalStatus === "rejected" && matchesCaptain(c));
+  const revokedCaptains = captains.filter((c) => c.approvalStatus === "revoked" && matchesCaptain(c));
 
-  const pendingPlayerRegs = playerRegs.filter((r) => r.status === "pending");
-  const resolvedPlayerRegs = playerRegs.filter((r) => r.status !== "pending");
+  const pendingPlayerRegs = playerRegs.filter((r) => r.status === "pending" && matchesPlayerReg(r));
+  const resolvedPlayerRegs = playerRegs.filter((r) => r.status !== "pending" && matchesPlayerReg(r));
+
+  const filteredAdmins = admins.filter(matchesAdmin);
 
   function StatusBadge({ status }: { status: string }) {
     const colours: Record<string, string> = {
       pending: "bg-yellow-500/15 text-yellow-400",
       approved: "bg-green-500/15 text-green-400",
       rejected: "bg-red-500/15 text-red-400",
+      revoked: "bg-orange-500/15 text-orange-400",
     };
     return (
       <span className={`rounded px-2 py-0.5 text-xs font-medium ${colours[status] ?? ""}`}>
@@ -182,53 +206,56 @@ export default function AdminPage() {
             </div>
             <div className="flex items-center gap-2">
               <StatusBadge status={c.approvalStatus} />
+
+              {/* Pending: approve or reject */}
               {c.approvalStatus === "pending" && (
                 <>
-                  <button
-                    type="button"
-                    disabled={actionId === c.id}
+                  <button type="button" disabled={actionId === c.id}
                     onClick={() => handleCaptainAction(c.id, "approve")}
-                    className="rounded bg-green-600/20 px-3 py-1.5 text-sm text-green-400 hover:bg-green-600/30"
-                  >
+                    className="rounded bg-green-600/20 px-3 py-1.5 text-sm text-green-400 hover:bg-green-600/30">
                     Approve
                   </button>
-                  <button
-                    type="button"
-                    disabled={actionId === c.id}
+                  <button type="button" disabled={actionId === c.id}
                     onClick={() => setPendingConfirm({
                       title: "Reject captain",
-                      message: `Reject ${c.teamName || c.email}? They won't be able to sign in.`,
+                      message: `Reject ${c.teamName || c.email}? They won't be able to register again with this email.`,
                       confirmLabel: "Reject",
                       onConfirm: () => { handleCaptainAction(c.id, "reject"); setPendingConfirm(null); },
                     })}
-                    className="rounded bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30"
-                  >
+                    className="rounded bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30">
                     Reject
                   </button>
                 </>
               )}
+
+              {/* Approved: revoke only */}
               {c.approvalStatus === "approved" && (
-                <button
-                  type="button"
-                  disabled={actionId === c.id}
+                <button type="button" disabled={actionId === c.id}
                   onClick={() => setPendingConfirm({
-                    title: "Revoke approval",
-                    message: `Revoke ${c.teamName || c.email}'s approval? They'll be blocked from signing in.`,
+                    title: "Revoke captain access",
+                    message: `Revoke ${c.teamName || c.email}'s access? They'll be blocked from signing in until re-approved.`,
                     confirmLabel: "Revoke",
-                    onConfirm: () => { handleCaptainAction(c.id, "reject"); setPendingConfirm(null); },
+                    onConfirm: () => { handleCaptainAction(c.id, "revoke"); setPendingConfirm(null); },
                   })}
-                  className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5"
-                >
+                  className="rounded bg-orange-600/20 px-3 py-1.5 text-sm text-orange-400 hover:bg-orange-600/30">
                   Revoke
                 </button>
               )}
+
+              {/* Rejected: re-approve (goes back to pending) */}
               {c.approvalStatus === "rejected" && (
-                <button
-                  type="button"
-                  disabled={actionId === c.id}
-                  onClick={() => handleCaptainAction(c.id, "approve")}
-                  className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5"
-                >
+                <button type="button" disabled={actionId === c.id}
+                  onClick={() => handleCaptainAction(c.id, "reapprove")}
+                  className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
+                  Re-approve
+                </button>
+              )}
+
+              {/* Revoked: re-approve (goes back to pending) */}
+              {c.approvalStatus === "revoked" && (
+                <button type="button" disabled={actionId === c.id}
+                  onClick={() => handleCaptainAction(c.id, "reapprove")}
+                  className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
                   Re-approve
                 </button>
               )}
@@ -246,244 +273,166 @@ export default function AdminPage() {
         <div className="flex gap-2">
           <Link href="/admin/users" className="btn-ghost">Users</Link>
           <Link href="/market" className="btn-ghost">Market</Link>
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={async () => {
-              await fetch("/api/auth/admin/logout", { method: "POST" });
-              router.push("/");
-              router.refresh();
-            }}
-          >
+          <button type="button" className="btn-ghost" onClick={async () => { await fetch("/api/auth/admin/logout", { method: "POST" }); router.push("/"); router.refresh(); }}>
             Sign out
           </button>
         </div>
       </div>
 
+      <div>
+        <input type="text" className="input max-w-md" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, email, team, phone..." />
+      </div>
+
       {loading ? (
-        <p className="text-[var(--muted)]">Loading…</p>
+        <p className="text-[var(--muted)]">Loading&hellip;</p>
       ) : (
         <>
-          {/* ── Pending player registrations ── */}
+          {/* ── Player verification requests (open) ── */}
           <section>
-            <h2 className="mb-3 text-lg font-semibold text-[var(--text)]">
-              Player verification requests{" "}
-              {pendingPlayerRegs.length > 0 && (
-                <span className="ml-1 rounded bg-yellow-500/20 px-2 py-0.5 text-sm text-yellow-400">
-                  {pendingPlayerRegs.length}
-                </span>
-              )}
-            </h2>
-            {pendingPlayerRegs.length === 0 ? (
-              <p className="text-sm text-[var(--muted)]">None.</p>
-            ) : (
-              <ul className="space-y-3">
-                {pendingPlayerRegs.map((r) => (
-                  <li key={r.id} className="card space-y-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium text-[var(--text)]">
-                          {r.firstName} {r.lastName}
-                        </p>
-                        <p className="text-sm text-[var(--muted)]">
-                          +{r.dialingCode} {r.phoneNumber}
-                        </p>
-                        {r.email && (
-                          <p className="text-sm text-[var(--muted)]">{r.email}</p>
-                        )}
-                        {r.teamName && (
-                          <p className="text-sm text-[var(--muted)]">Team: {r.teamName}</p>
-                        )}
-                        {r.personId && (
-                          <p className="text-sm font-mono text-[var(--accent)]">
-                            Person ID: {r.personId}
-                          </p>
-                        )}
-                        {r.notes && (
-                          <p className="mt-1 text-sm italic text-[var(--muted)]">
-                            &ldquo;{r.notes}&rdquo;
-                          </p>
-                        )}
-                        <p className="text-xs text-[var(--muted)]">
-                          Submitted {new Date(r.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <StatusBadge status={r.status} />
-                    </div>
-
-                    {/* Link & approve inline form */}
-                    {linkingId === r.id ? (
-                      <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3">
-                        <p className="text-sm font-medium text-[var(--text)]">
-                          Link to LeagueRepublic player
-                        </p>
-                        <input
-                          type="text"
-                          className="input"
-                          value={linkPersonId}
-                          onChange={(e) => setLinkPersonId(e.target.value)}
-                          placeholder="Person ID (e.g. PERSON_3377)"
-                        />
-                        <input
-                          type="text"
-                          className="input"
-                          value={linkNotes}
-                          onChange={(e) => setLinkNotes(e.target.value)}
-                          placeholder="Admin notes (optional)"
-                        />
-                        {linkError && (
-                          <p className="text-sm text-[var(--danger)]">{linkError}</p>
-                        )}
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            disabled={actionId === r.id}
-                            onClick={() =>
-                              handlePlayerRegAction(
-                                r.id,
-                                "approve",
-                                linkNotes || undefined,
-                                linkPersonId || undefined
-                              )
-                            }
-                            className="rounded bg-green-600/20 px-3 py-1.5 text-sm text-green-400 hover:bg-green-600/30"
-                          >
-                            {linkPersonId ? "Link & approve" : "Approve without linking"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLinkingId(null);
-                              setLinkPersonId("");
-                              setLinkNotes("");
-                              setLinkError("");
-                            }}
-                            className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5"
-                          >
-                            Cancel
-                          </button>
+            <details open>
+              <summary className="cursor-pointer text-lg font-semibold text-[var(--text)] hover:text-[var(--accent)]">
+                Player verification requests{" "}
+                {pendingPlayerRegs.length > 0 && (
+                  <span className="ml-1 rounded bg-yellow-500/20 px-2 py-0.5 text-sm text-yellow-400">{pendingPlayerRegs.length}</span>
+                )}
+              </summary>
+              <div className="mt-3">
+                {pendingPlayerRegs.length === 0 ? (
+                  <p className="text-sm text-[var(--muted)]">None.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {pendingPlayerRegs.map((r) => (
+                      <li key={r.id} className="card space-y-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-[var(--text)]">{r.firstName} {r.lastName}</p>
+                            <p className="text-sm text-[var(--muted)]">+{r.dialingCode} {r.phoneNumber}</p>
+                            {r.email && <p className="text-sm text-[var(--muted)]">{r.email}</p>}
+                            {r.teamName && <p className="text-sm text-[var(--muted)]">Team: {r.teamName}</p>}
+                            {r.personId && <p className="text-sm font-mono text-[var(--accent)]">Person ID: {r.personId}</p>}
+                            {r.notes && <p className="mt-1 text-sm italic text-[var(--muted)]">&ldquo;{r.notes}&rdquo;</p>}
+                            <p className="text-xs text-[var(--muted)]">Submitted {new Date(r.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <StatusBadge status={r.status} />
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          disabled={actionId === r.id}
-                          onClick={() => {
-                            setLinkingId(r.id);
-                            setLinkPersonId(r.personId || "");
-                            setLinkNotes("");
-                            setLinkError("");
-                          }}
-                          className="rounded bg-green-600/20 px-3 py-1.5 text-sm text-green-400 hover:bg-green-600/30"
-                        >
-                          Approve / Link
-                        </button>
-                        <button
-                          type="button"
-                          disabled={actionId === r.id}
-                          onClick={() => setPendingConfirm({
-                            title: "Reject registration",
-                            message: `Reject ${r.firstName} ${r.lastName}'s registration request?`,
-                            confirmLabel: "Reject",
-                            onConfirm: () => { handlePlayerRegAction(r.id, "reject"); setPendingConfirm(null); },
-                          })}
-                          className="rounded bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* Resolved registrations (collapsed) */}
-            {resolvedPlayerRegs.length > 0 && (
-              <details className="mt-4">
-                <summary className="cursor-pointer text-sm text-[var(--muted)] hover:text-[var(--text)]">
-                  Show resolved ({resolvedPlayerRegs.length})
-                </summary>
-                <ul className="mt-2 space-y-2">
-                  {resolvedPlayerRegs.map((r) => (
-                    <li
-                      key={r.id}
-                      className="card flex flex-wrap items-center justify-between gap-3 opacity-60"
-                    >
-                      <div>
-                        <p className="text-sm text-[var(--text)]">
-                          {r.firstName} {r.lastName} — +{r.dialingCode} {r.phoneNumber}
-                        </p>
-                        {r.adminNotes && (
-                          <p className="text-xs text-[var(--muted)]">Note: {r.adminNotes}</p>
+                        {linkingId === r.id ? (
+                          <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3">
+                            <p className="text-sm font-medium text-[var(--text)]">Link to LeagueRepublic player</p>
+                            <input type="text" className="input" value={linkPersonId} onChange={(e) => setLinkPersonId(e.target.value)} placeholder="Person ID (e.g. PERSON_3377)" />
+                            <input type="text" className="input" value={linkNotes} onChange={(e) => setLinkNotes(e.target.value)} placeholder="Admin notes (optional)" />
+                            {linkError && <p className="text-sm text-[var(--danger)]">{linkError}</p>}
+                            <div className="flex gap-2">
+                              <button type="button" disabled={actionId === r.id} onClick={() => handlePlayerRegAction(r.id, "approve", linkNotes || undefined, linkPersonId || undefined)}
+                                className="rounded bg-green-600/20 px-3 py-1.5 text-sm text-green-400 hover:bg-green-600/30">{linkPersonId ? "Link & approve" : "Approve without linking"}</button>
+                              <button type="button" onClick={() => { setLinkingId(null); setLinkPersonId(""); setLinkNotes(""); setLinkError(""); }}
+                                className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button type="button" disabled={actionId === r.id} onClick={() => { setLinkingId(r.id); setLinkPersonId(r.personId || ""); setLinkNotes(""); setLinkError(""); }}
+                              className="rounded bg-green-600/20 px-3 py-1.5 text-sm text-green-400 hover:bg-green-600/30">Approve / Link</button>
+                            <button type="button" disabled={actionId === r.id}
+                              onClick={() => setPendingConfirm({ title: "Reject registration", message: `Reject ${r.firstName} ${r.lastName}'s registration request?`, confirmLabel: "Reject", onConfirm: () => { handlePlayerRegAction(r.id, "reject"); setPendingConfirm(null); } })}
+                              className="rounded bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30">Reject</button>
+                          </div>
                         )}
-                      </div>
-                      <StatusBadge status={r.status} />
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {resolvedPlayerRegs.length > 0 && (
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-sm text-[var(--muted)] hover:text-[var(--text)]">Show resolved ({resolvedPlayerRegs.length})</summary>
+                    <ul className="mt-2 space-y-2">
+                      {resolvedPlayerRegs.map((r) => (
+                        <li key={r.id} className="card flex flex-wrap items-center justify-between gap-3 opacity-60">
+                          <div>
+                            <p className="text-sm text-[var(--text)]">{r.firstName} {r.lastName} — +{r.dialingCode} {r.phoneNumber}</p>
+                            {r.adminNotes && <p className="text-xs text-[var(--muted)]">Note: {r.adminNotes}</p>}
+                          </div>
+                          <StatusBadge status={r.status} />
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            </details>
           </section>
 
-          {/* ── Captain sections ── */}
+          {/* ── Captains: pending (open) ── */}
           <section>
-            <h2 className="mb-3 text-lg font-semibold text-[var(--text)]">
-              Captain pending approval{" "}
-              {pendingCaptains.length > 0 && (
-                <span className="ml-1 rounded bg-yellow-500/20 px-2 py-0.5 text-sm text-yellow-400">
-                  {pendingCaptains.length}
-                </span>
-              )}
-            </h2>
-            <CaptainTable rows={pendingCaptains} />
+            <details open>
+              <summary className="cursor-pointer text-lg font-semibold text-[var(--text)] hover:text-[var(--accent)]">
+                Captain pending approval{" "}
+                {pendingCaptains.length > 0 && (
+                  <span className="ml-1 rounded bg-yellow-500/20 px-2 py-0.5 text-sm text-yellow-400">{pendingCaptains.length}</span>
+                )}
+              </summary>
+              <div className="mt-3"><CaptainTable rows={pendingCaptains} /></div>
+            </details>
           </section>
 
+          {/* ── Captains: approved (collapsed) ── */}
           <section>
-            <h2 className="mb-3 text-lg font-semibold text-[var(--text)]">Approved captains</h2>
-            <CaptainTable rows={approvedCaptains} />
+            <details>
+              <summary className="cursor-pointer text-lg font-semibold text-[var(--text)] hover:text-[var(--accent)]">
+                Approved captains ({approvedCaptains.length})
+              </summary>
+              <div className="mt-3"><CaptainTable rows={approvedCaptains} /></div>
+            </details>
           </section>
 
+          {/* ── Captains: revoked (collapsed) ── */}
           <section>
-            <h2 className="mb-3 text-lg font-semibold text-[var(--text)]">Rejected captains</h2>
-            <CaptainTable rows={rejectedCaptains} />
+            <details>
+              <summary className="cursor-pointer text-lg font-semibold text-[var(--text)] hover:text-[var(--accent)]">
+                Revoked captains ({revokedCaptains.length})
+              </summary>
+              <div className="mt-3"><CaptainTable rows={revokedCaptains} /></div>
+            </details>
           </section>
-          {/* ── Admin accounts ── */}
+
+          {/* ── Captains: rejected (collapsed) ── */}
           <section>
-            <h2 className="mb-3 text-lg font-semibold text-[var(--text)]">Admin accounts</h2>
-            {admins.length === 0 ? (
-              <p className="text-sm text-[var(--muted)]">None.</p>
-            ) : (
-              <ul className="space-y-2">
-                {admins.map((a) => (
-                  <li key={a.id} className="card flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--text)]">{a.email}</p>
-                      <p className="text-xs text-[var(--muted)]">
-                        Added {new Date(a.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-2 text-xs text-[var(--muted)]">
-              To add or remove admins, use the terminal script.
-            </p>
+            <details>
+              <summary className="cursor-pointer text-lg font-semibold text-[var(--text)] hover:text-[var(--accent)]">
+                Rejected captains ({rejectedCaptains.length})
+              </summary>
+              <div className="mt-3"><CaptainTable rows={rejectedCaptains} /></div>
+            </details>
+          </section>
+
+          {/* ── Admin accounts (collapsed) ── */}
+          <section>
+            <details>
+              <summary className="cursor-pointer text-lg font-semibold text-[var(--text)] hover:text-[var(--accent)]">
+                Admin accounts ({filteredAdmins.length})
+              </summary>
+              <div className="mt-3">
+                {filteredAdmins.length === 0 ? (
+                  <p className="text-sm text-[var(--muted)]">None.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {filteredAdmins.map((a) => (
+                      <li key={a.id} className="card flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-[var(--text)]">{a.email}</p>
+                          <p className="text-xs text-[var(--muted)]">Added {new Date(a.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-2 text-xs text-[var(--muted)]">To add or remove admins, use the terminal script.</p>
+              </div>
+            </details>
           </section>
         </>
       )}
 
-      <ConfirmModal
-        open={!!pendingConfirm}
-        title={pendingConfirm?.title ?? ""}
-        message={pendingConfirm?.message ?? ""}
-        confirmLabel={pendingConfirm?.confirmLabel ?? "Confirm"}
-        danger
-        onConfirm={() => pendingConfirm?.onConfirm()}
-        onCancel={() => setPendingConfirm(null)}
-      />
+      <ConfirmModal open={!!pendingConfirm} title={pendingConfirm?.title ?? ""} message={pendingConfirm?.message ?? ""} confirmLabel={pendingConfirm?.confirmLabel ?? "Confirm"} danger onConfirm={() => pendingConfirm?.onConfirm()} onCancel={() => setPendingConfirm(null)} />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Toast from "@/components/Toast";
+import { PLATFORMS } from "@/lib/platforms";
 
 type PlayerUser = {
   type: "player";
@@ -64,6 +65,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"players" | "captains">("players");
   const [editing, setEditing] = useState<EditingUser | null>(null);
+  const [editPlatforms, setEditPlatforms] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [editError, setEditError] = useState("");
@@ -104,7 +106,7 @@ export default function AdminUsersPage() {
         lastName: p.lastName || "",
         gamertag: p.gamertag || "",
         email: p.email || "",
-        mobilePhone: p.mobilePhone || "",
+        authPhone: p.authPhone ? `+${p.authPhone}` : (p.mobilePhone || ""),
         teams: p.teams || "",
         role: p.role || "",
         platform: p.platform || "",
@@ -116,13 +118,23 @@ export default function AdminUsersPage() {
   }
 
   function startEditCaptain(c: CaptainUser) {
+    // Parse platform — could be JSON array or single string
+    let plats: string[] = [];
+    if (c.platform) {
+      try {
+        const parsed = JSON.parse(c.platform);
+        plats = Array.isArray(parsed) ? parsed : [c.platform];
+      } catch {
+        plats = c.platform.trim() ? [c.platform.trim()] : [];
+      }
+    }
+    setEditPlatforms(plats);
     setEditing({
       type: "captain",
       id: c.id,
       fields: {
         email: c.email || "",
         teamName: c.teamName || "",
-        platform: c.platform || "",
         role: c.role || "",
         clubStatus: c.clubStatus || "",
         whatsappNumber: c.whatsappNumber || "",
@@ -144,6 +156,11 @@ export default function AdminUsersPage() {
     setSaving(true);
     setEditError("");
     try {
+      const payload: Record<string, unknown> = { ...editing.fields };
+      // For captains, include platforms as JSON string
+      if (editing.type === "captain") {
+        payload.platform = JSON.stringify(editPlatforms);
+      }
       const res = await fetch("/api/admin/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -151,7 +168,7 @@ export default function AdminUsersPage() {
         body: JSON.stringify({
           type: editing.type,
           id: editing.id,
-          data: editing.fields,
+          data: payload,
         }),
       });
       const data = await res.json();
@@ -160,8 +177,9 @@ export default function AdminUsersPage() {
         return;
       }
       setEditing(null);
+      setEditPlatforms([]);
       setShowSaved(true);
-      fetchUsers(); // refresh list
+      fetchUsers();
     } finally {
       setSaving(false);
     }
@@ -272,7 +290,13 @@ export default function AdminUsersPage() {
                     <li key={c.id} className="card">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="font-medium text-[var(--text)]">{c.teamName || "(no team name)"}</p>
+                          <p className="font-medium text-[var(--text)] flex items-center gap-2">
+                            <span className={`inline-block h-2.5 w-2.5 rounded-full ${c.approvalStatus === "approved" ? "bg-green-400" : "bg-yellow-400"}`} />
+                            {c.teamName || "(no team name)"}
+                            {c.approvalStatus === "pending" && (
+                              <span className="rounded bg-yellow-500/15 px-2 py-0.5 text-xs font-medium text-yellow-400">pending</span>
+                            )}
+                          </p>
                           <p className="text-sm text-[var(--muted)]">{c.email}</p>
                           {c.whatsappNumber && (
                             <p className="text-sm text-[var(--muted)]">WhatsApp: {c.whatsappNumber}</p>
@@ -318,6 +342,7 @@ export default function AdminUsersPage() {
                 lastName: "Last name",
                 gamertag: "Gamertag",
                 email: "Email",
+                authPhone: "Phone number",
                 mobilePhone: "Phone number",
                 teams: "Team",
                 role: "Role",
@@ -332,22 +357,58 @@ export default function AdminUsersPage() {
                 approvalStatus: "Approval status",
               };
               const label = labels[key] || key;
+
+              // Dropdown options for specific fields
+              const dropdowns: Record<string, { value: string; label: string }[]> = {
+                role: [
+                  { value: "", label: "Select role" },
+                  { value: "Starter", label: "Starter" },
+                  { value: "Rotation", label: "Rotation" },
+                ],
+                platform: [
+                  { value: "", label: "Select platform" },
+                  { value: "PC", label: "PC" },
+                  { value: "PS5", label: "PS5" },
+                  { value: "Xbox", label: "Xbox" },
+                ],
+                status: [
+                  { value: "", label: "Select status" },
+                  { value: "Active", label: "Active" },
+                  { value: "Inactive", label: "Inactive" },
+                ],
+                clubStatus: [
+                  { value: "", label: "Select club status" },
+                  { value: "Free agents only", label: "Free agents only" },
+                  { value: "Will pay transfer fee (R200)", label: "Will pay transfer fee (R200)" },
+                  { value: "Open to both", label: "Open to both" },
+                ],
+                approvalStatus: [
+                  { value: "pending", label: "pending" },
+                  { value: "approved", label: "approved" },
+                  { value: "rejected", label: "rejected" },
+                  { value: "revoked", label: "revoked" },
+                ],
+              };
+
+              const isDropdown = key in dropdowns;
+              const isTextarea = key === "requirements" || key === "bio";
+
               return (
               <div key={key}>
                 <label className="block text-sm font-medium text-[var(--muted)]">
                   {label}
                 </label>
-                {key === "approvalStatus" ? (
+                {isDropdown ? (
                   <select
                     className="input mt-1"
                     value={value}
                     onChange={(e) => updateField(key, e.target.value)}
                   >
-                    <option value="pending">pending</option>
-                    <option value="approved">approved</option>
-                    <option value="rejected">rejected</option>
+                    {dropdowns[key].map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                   </select>
-                ) : key === "requirements" || key === "bio" ? (
+                ) : isTextarea ? (
                   <textarea
                     className="input mt-1"
                     rows={3}
@@ -365,6 +426,29 @@ export default function AdminUsersPage() {
               </div>
               );
             })}
+
+            {/* Platform toggle buttons for captains */}
+            {editing.type === "captain" && (
+              <div>
+                <label className="block text-sm font-medium text-[var(--muted)]">Platform</label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {PLATFORMS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setEditPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p])}
+                      className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                        editPlatforms.includes(p)
+                          ? "border-[var(--accent)] bg-[var(--accent)]/20 text-[var(--accent)]"
+                          : "border-[var(--border)] text-[var(--muted)] hover:bg-white/5"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {editError && <p className="text-sm text-[var(--danger)]">{editError}</p>}
 

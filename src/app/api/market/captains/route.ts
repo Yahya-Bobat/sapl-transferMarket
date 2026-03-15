@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseLeagues } from "@/lib/leagues";
 import { parsePositions } from "@/lib/positions";
+import { parsePlatforms } from "@/lib/platforms";
 import { getCurrentPlayer, getCurrentAdmin } from "@/lib/auth";
 
 export async function GET() {
@@ -42,6 +43,7 @@ export async function GET() {
           email: c.email,
           teamName: c.teamName,
           platform: c.platform,
+          platforms: parsePlatforms(c.platform),
           preferredLeagues: parseLeagues(c.preferredLeagues),
           preferredPositions: parsePositions(c.preferredPositions),
           role: c.role,

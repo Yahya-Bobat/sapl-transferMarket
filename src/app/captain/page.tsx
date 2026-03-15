@@ -55,7 +55,7 @@ export default function CaptainPage() {
   // Form state
   const [teamName, setTeamName] = useState("");
   const [listed, setListed] = useState(false);
-  const [platform, setPlatform] = useState("");
+  const [platforms, setPlatforms] = useState<string[]>([]);
   const [preferredLeagues, setPreferredLeagues] = useState<string[]>([]);
   const [preferredPositions, setPreferredPositions] = useState<string[]>([]);
   const [role, setRole] = useState("");
@@ -75,7 +75,7 @@ export default function CaptainPage() {
         setCaptain(data);
         setTeamName(data.teamName ?? "");
         setListed(data.listed ?? false);
-        setPlatform(data.platform ?? "");
+        setPlatforms(Array.isArray(data.platforms) ? data.platforms : []);
         setPreferredLeagues(Array.isArray(data.preferredLeagues) ? data.preferredLeagues : []);
         setPreferredPositions(Array.isArray(data.preferredPositions) ? data.preferredPositions : []);
         setRole(data.role ?? "");
@@ -109,6 +109,12 @@ export default function CaptainPage() {
     );
   }
 
+  function togglePlatform(p: string) {
+    setPlatforms((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+    );
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -119,7 +125,7 @@ export default function CaptainPage() {
         body: JSON.stringify({
           teamName: teamName.trim() || null,
           listed,
-          platform: platform.trim() || null,
+          platforms,
           preferredLeagues,
           preferredPositions,
           role: role.trim() || null,
@@ -205,16 +211,22 @@ export default function CaptainPage() {
 
         <div>
           <label className="block text-sm font-medium text-[var(--text)]">Platform</label>
-          <select
-            className="input mt-1 max-w-xs"
-            value={platform}
-            onChange={(e) => setPlatform(e.target.value)}
-          >
-            <option value="">Select platform</option>
+          <div className="mt-2 flex flex-wrap gap-2">
             {PLATFORMS.map((p) => (
-              <option key={p} value={p}>{p}</option>
+              <button
+                key={p}
+                type="button"
+                onClick={() => togglePlatform(p)}
+                className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                  platforms.includes(p)
+                    ? "border-[var(--accent)] bg-[var(--accent)]/20 text-[var(--accent)]"
+                    : "border-[var(--border)] text-[var(--muted)] hover:bg-white/5"
+                }`}
+              >
+                {p}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
         <div>

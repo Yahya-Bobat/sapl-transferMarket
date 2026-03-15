@@ -3,6 +3,7 @@ import { getCurrentCaptain } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseLeagues } from "@/lib/leagues";
 import { parsePositions } from "@/lib/positions";
+import { parsePlatforms } from "@/lib/platforms";
 
 export async function GET() {
   const captain = await getCurrentCaptain();
@@ -15,7 +16,7 @@ export async function GET() {
     teamName: captain.teamName,
     listed: captain.listed,
     approvalStatus: captain.approvalStatus,
-    platform: captain.platform,
+    platforms: parsePlatforms(captain.platform),
     preferredLeagues: parseLeagues(captain.preferredLeagues),
     preferredPositions: parsePositions(captain.preferredPositions),
     role: captain.role,
@@ -36,7 +37,7 @@ export async function PATCH(request: Request) {
     const {
       teamName,
       listed,
-      platform,
+      platforms,
       preferredLeagues,
       preferredPositions,
       role,
@@ -47,7 +48,7 @@ export async function PATCH(request: Request) {
     } = body as {
       teamName?: string | null;
       listed?: boolean;
-      platform?: string | null;
+      platforms?: string[];
       preferredLeagues?: string[];
       preferredPositions?: string[];
       role?: string | null;
@@ -60,7 +61,7 @@ export async function PATCH(request: Request) {
     const data: Parameters<typeof prisma.captain.update>[0]["data"] = {};
     if (teamName !== undefined) data.teamName = teamName?.trim() || null;
     if (listed !== undefined) data.listed = listed;
-    if (platform !== undefined) data.platform = platform?.trim() || null;
+    if (Array.isArray(platforms)) data.platform = JSON.stringify(platforms);
     if (Array.isArray(preferredLeagues)) data.preferredLeagues = JSON.stringify(preferredLeagues);
     if (Array.isArray(preferredPositions)) data.preferredPositions = JSON.stringify(preferredPositions);
     if (role !== undefined) data.role = role?.trim() || null;
@@ -80,7 +81,7 @@ export async function PATCH(request: Request) {
       teamName: updated.teamName,
       listed: updated.listed,
       approvalStatus: updated.approvalStatus,
-      platform: updated.platform,
+      platforms: parsePlatforms(updated.platform),
       preferredLeagues: parseLeagues(updated.preferredLeagues),
       preferredPositions: parsePositions(updated.preferredPositions),
       role: updated.role,

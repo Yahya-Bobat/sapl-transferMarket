@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Toast from "@/components/Toast";
+import { PLATFORMS } from "@/lib/platforms";
 
 type PlayerUser = {
   type: "player";
@@ -64,6 +65,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"players" | "captains">("players");
   const [editing, setEditing] = useState<EditingUser | null>(null);
+  const [editPlatforms, setEditPlatforms] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [editError, setEditError] = useState("");
@@ -116,13 +118,23 @@ export default function AdminUsersPage() {
   }
 
   function startEditCaptain(c: CaptainUser) {
+    // Parse platform — could be JSON array or single string
+    let plats: string[] = [];
+    if (c.platform) {
+      try {
+        const parsed = JSON.parse(c.platform);
+        plats = Array.isArray(parsed) ? parsed : [c.platform];
+      } catch {
+        plats = c.platform.trim() ? [c.platform.trim()] : [];
+      }
+    }
+    setEditPlatforms(plats);
     setEditing({
       type: "captain",
       id: c.id,
       fields: {
         email: c.email || "",
         teamName: c.teamName || "",
-        platform: c.platform || "",
         role: c.role || "",
         clubStatus: c.clubStatus || "",
         whatsappNumber: c.whatsappNumber || "",
@@ -144,6 +156,11 @@ export default function AdminUsersPage() {
     setSaving(true);
     setEditError("");
     try {
+      const payload: Record<string, unknown> = { ...editing.fields };
+      // For captains, include platforms as JSON string
+      if (editing.type === "captain") {
+        payload.platform = JSON.stringify(editPlatforms);
+      }
       const res = await fetch("/api/admin/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -151,7 +168,7 @@ export default function AdminUsersPage() {
         body: JSON.stringify({
           type: editing.type,
           id: editing.id,
-          data: editing.fields,
+          data: payload,
         }),
       });
       const data = await res.json();
@@ -160,8 +177,9 @@ export default function AdminUsersPage() {
         return;
       }
       setEditing(null);
+      setEditPlatforms([]);
       setShowSaved(true);
-      fetchUsers(); // refresh list
+      fetchUsers();
     } finally {
       setSaving(false);
     }
@@ -408,6 +426,29 @@ export default function AdminUsersPage() {
               </div>
               );
             })}
+
+            {/* Platform toggle buttons for captains */}
+            {editing.type === "captain" && (
+              <div>
+                <label className="block text-sm font-medium text-[var(--muted)]">Platform</label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {PLATFORMS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setEditPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p])}
+                      className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                        editPlatforms.includes(p)
+                          ? "border-[var(--accent)] bg-[var(--accent)]/20 text-[var(--accent)]"
+                          : "border-[var(--border)] text-[var(--muted)] hover:bg-white/5"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {editError && <p className="text-sm text-[var(--danger)]">{editError}</p>}
 

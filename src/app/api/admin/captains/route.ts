@@ -22,7 +22,7 @@ export async function GET() {
   return NextResponse.json(captains);
 }
 
-// PATCH /api/admin/captains — approve or reject a captain
+// PATCH /api/admin/captains — approve, reject, revoke, or reapprove a captain
 export async function PATCH(request: Request) {
   const admin = await getCurrentAdmin();
   if (!admin) {
@@ -31,14 +31,22 @@ export async function PATCH(request: Request) {
   try {
     const { captainId, action } = (await request.json()) as {
       captainId: string;
-      action: "approve" | "reject";
+      action: "approve" | "reject" | "revoke" | "reapprove";
     };
-    if (!captainId || !["approve", "reject"].includes(action)) {
+    if (!captainId || !["approve", "reject", "revoke", "reapprove"].includes(action)) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
+
+    const statusMap: Record<string, string> = {
+      approve: "approved",
+      reject: "rejected",
+      revoke: "revoked",
+      reapprove: "pending",
+    };
+
     const updated = await prisma.captain.update({
       where: { id: captainId },
-      data: { approvalStatus: action === "approve" ? "approved" : "rejected" },
+      data: { approvalStatus: statusMap[action] },
     });
     return NextResponse.json({ ok: true, approvalStatus: updated.approvalStatus });
   } catch (e) {

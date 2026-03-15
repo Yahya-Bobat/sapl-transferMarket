@@ -272,7 +272,13 @@ export default function AdminUsersPage() {
                     <li key={c.id} className="card">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="font-medium text-[var(--text)]">{c.teamName || "(no team name)"}</p>
+                          <p className="font-medium text-[var(--text)] flex items-center gap-2">
+                            <span className={`inline-block h-2.5 w-2.5 rounded-full ${c.approvalStatus === "approved" ? "bg-green-400" : "bg-yellow-400"}`} />
+                            {c.teamName || "(no team name)"}
+                            {c.approvalStatus === "pending" && (
+                              <span className="rounded bg-yellow-500/15 px-2 py-0.5 text-xs font-medium text-yellow-400">pending</span>
+                            )}
+                          </p>
                           <p className="text-sm text-[var(--muted)]">{c.email}</p>
                           {c.whatsappNumber && (
                             <p className="text-sm text-[var(--muted)]">WhatsApp: {c.whatsappNumber}</p>
@@ -346,6 +352,7 @@ export default function AdminUsersPage() {
                     <option value="pending">pending</option>
                     <option value="approved">approved</option>
                     <option value="rejected">rejected</option>
+                    <option value="revoked">revoked</option>
                   </select>
                 ) : key === "requirements" || key === "bio" ? (
                   <textarea

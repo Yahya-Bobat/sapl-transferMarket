@@ -577,10 +577,35 @@ export default function MarketPage() {
                         </>
                       )}
                       {isAdmin && (
-                        <button type="button" onClick={() => copyToClipboard(buildCaptainPost(c), `captain-${c.id}`)}
-                          className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
-                          {copiedId === `captain-${c.id}` ? "Copied ✓" : getCopiedLabel(`captain-${c.id}`)}
-                        </button>
+                        <>
+                          <button type="button" onClick={() => copyToClipboard(buildCaptainPost(c), `captain-${c.id}`)}
+                            className="rounded border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:bg-white/5">
+                            {copiedId === `captain-${c.id}` ? "Copied ✓" : getCopiedLabel(`captain-${c.id}`)}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={delistingId === `captain-${c.id}`}
+                            onClick={async () => {
+                              setDelistingId(`captain-${c.id}`);
+                              try {
+                                const res = await fetch("/api/admin/users", {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  credentials: "include",
+                                  body: JSON.stringify({ type: "captain", id: c.id, data: { listed: false } }),
+                                });
+                                if (res.ok) {
+                                  setCaptains((prev) => prev.filter((cap) => cap.id !== c.id));
+                                }
+                              } finally {
+                                setDelistingId(null);
+                              }
+                            }}
+                            className="rounded bg-red-600/20 px-3 py-1.5 text-sm text-red-400 hover:bg-red-600/30"
+                          >
+                            {delistingId === `captain-${c.id}` ? "Delisting…" : "Delist"}
+                          </button>
+                        </>
                       )}
                     </div>
                   </li>

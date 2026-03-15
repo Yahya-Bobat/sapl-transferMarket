@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     });
 
     const captains = await prisma.captain.findMany({
+      where: { approvalStatus: { notIn: ["rejected", "revoked"] } },
       orderBy: { createdAt: "desc" },
     });
 

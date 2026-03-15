@@ -58,6 +58,12 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
+    if (captain.approvalStatus === "revoked") {
+      return NextResponse.json(
+        { error: "Your account access has been revoked. Please contact the league admin." },
+        { status: 403 }
+      );
+    }
     await setCaptainSession(captain.id);
     return NextResponse.json({
       ok: true,

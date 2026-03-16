@@ -17,7 +17,7 @@ type MarketPlayer = {
   preferredPositions: string[];
   preferredLeagues: string[];
   bio: string | null;
-  updatedAt: string;
+  listedAt: string;
   whatsappLink?: string | null;
   whatsappNumber?: string | null;
   previousClub?: string | null;
@@ -38,7 +38,7 @@ type CaptainCard = {
   requirements: string | null;
   whatsappNumber: string | null;
   whatsappLink: string | null;
-  updatedAt: string;
+  listedAt: string;
 };
 
 type Tab = "players" | "captains";
@@ -431,7 +431,7 @@ export default function MarketPage() {
                           <span className="rounded bg-[var(--border)] px-2 py-0.5 text-xs text-[var(--muted)]">{p.gamertag}</span>
                         )}
                       </div>
-                      <span className="text-xs text-[var(--muted)]">{timeAgo(p.updatedAt)}</span>
+                      <span className="text-xs text-[var(--muted)]">{timeAgo(p.listedAt)}</span>
                     </div>
                     {(p.role || p.platform) && (
                       <p className="mt-1 text-sm text-[var(--muted)]">{[p.role, p.platform].filter(Boolean).join(" · ")}</p>
@@ -572,7 +572,7 @@ export default function MarketPage() {
                   <li key={c.id} className="card flex flex-col">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-semibold text-[var(--text)]">{c.teamName || "Unknown Team"}</span>
-                      <span className="text-xs text-[var(--muted)]">{timeAgo(c.updatedAt)}</span>
+                      <span className="text-xs text-[var(--muted)]">{timeAgo(c.listedAt)}</span>
                     </div>
                     {c.platforms.length > 0 && <p className="mt-1 text-sm text-[var(--muted)]">{c.platforms.join(", ")}</p>}
                     {c.preferredLeagues.length > 0 && (
